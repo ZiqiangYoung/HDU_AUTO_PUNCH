@@ -24,9 +24,10 @@ class Punch:
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         self.driver = webdriver.Chrome(service=Service('/usr/bin/chromedriver'), options=chrome_options)
+        # self.driver = webdriver.Chrome(options=chrome_options)
         self.wait = WebDriverWait(self.driver, 3, 0.5)
 
-    # 获取本地 SESSIONID
+    # 获取本地 SessionID
     def login(self):
         try:
             self.driver.get("https://cas.hdu.edu.cn/cas/login")
@@ -39,8 +40,9 @@ class Punch:
             self.driver.find_element(By.ID, 'pd').send_keys(self.pd)  # 输入密码
             self.driver.find_element(By.ID, 'index_login_btn').click()
         except Exception as e:
-            print(e.__class__.__name__ + "无法访问数字杭电")
-            self.wechatNotice("无法访问数字杭电")
+            errorMessage = "无法访问数字杭电：" + e.__class__.__name__ + "\n" + str(e)
+            print(errorMessage)
+            self.wechatNotice(errorMessage)
             sys.exit(1)
 
         try:
@@ -49,6 +51,7 @@ class Punch:
             self.wechatNotice(self.un + "帐号登录失败")
         except TimeoutException as e:
             self.driver.get("https://skl.hduhelp.com/passcard.html#/passcard")
+            sessionId = None
             for retryCnt in range(10):
                 time.sleep(1)
                 sessionId = self.driver.execute_script("return window.localStorage.getItem('sessionId')")
@@ -59,10 +62,10 @@ class Punch:
             self.driver.quit()
 
     # 执行打卡
-    def send(self, sessionid):
+    def send(self, sessionId):
         headers = {
             'Content-Type': 'application/json',
-            'X-Auth-Token': sessionid,
+            'X-Auth-Token': sessionId,
             'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 4 XL Build/RQ3A.210705.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/83.0.4103.106 Mobile Safari/537.36 AliApp(DingTalk/5.1.5) com.alibaba.android.rimet/13534898 Channel/212200 language/zh-CN UT4Aplus/0.2.25 colorScheme/light'
         }
         url = "https://skl.hdu.edu.cn/api/punch"
@@ -98,8 +101,16 @@ class Punch:
     def wechatNotice(self, message):
         if self.SCKey != '':
             url = 'https://sctapi.ftqq.com/{0}.send'.format(self.SCKey)
+            wrapIndex = message.find("\n")
+            desp = ''
+            if wrapIndex == -1:
+                title = message
+            else:
+                title = message[0:wrapIndex]
+                desp = message[wrapIndex + 1:]
             data = {
-                'title': message,
+                'title': title,
+                'desp': desp
             }
             try:
                 r = requests.post(url, data=data)
